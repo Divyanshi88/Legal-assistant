@@ -1,31 +1,38 @@
-# Core LangChain components
+# LangChain Core
 langchain>=0.1.0
 langchain-core>=0.1.0
 langchain-community>=0.1.0
 langchain-openai>=0.1.0
 
-# Vector store
+# Vector Store
 chromadb>=0.4.0
 
-# Embeddings (local)
+# Embedding Models
 sentence-transformers>=2.2.0
 torch>=1.13.0
 
-# PDF processing
+# PDF Processing
 pypdf>=4.0.0
 
-# OpenAI / OpenRouter
+# OpenAI / OpenRouter Clients
 openai>=1.0.0
 tiktoken>=0.5.0
 
-# Utility libraries
+# Utilities
 python-dotenv>=1.0.0
 numpy>=1.24.0
-
-# Streamlit and related tools
-streamlit>=1.25.0
-streamlit-chat  # if you're using Streamlit chatbot UI
-watchdog        # needed for file-watching in Streamlit Cloud
-
-# Optional (safe defaults)
 requests>=2.31.0
+pandas==2.0.3
+requests==2.31.0
+urllib3==2.0.7
+pydantic==2.5.0
+faiss-cpu==1.7.4
+huggingface-hub==0.20.1
+transformers==4.36.2
+torch==2.1.2
+tokenizers==0.15.0
+
+# Streamlit & Related
+streamlit>=1.25.0
+streamlit-chat>=0.0.2  # or match the version you're using
+watchdog>=3.0.0        # file monitoring in Streamlit Cloud

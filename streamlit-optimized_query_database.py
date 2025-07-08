@@ -1,71 +1,67 @@
-# query_database.py - Streamlit optimized version
+# query_database.py
 
 import os
 import time
 from typing import List, Dict, Any
 from dotenv import load_dotenv
-import streamlit as st
 
-# Load environment variables
+from langchain_openai import ChatOpenAI
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import Chroma
+from langchain.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.documents import Document
+
+# Load environment variables first
 load_dotenv()
 
-# Import dependencies with error handling
+# Try to import config, with fallback defaults
 try:
-    from langchain_openai import ChatOpenAI
-    from langchain_community.embeddings import HuggingFaceEmbeddings
-    from langchain_community.vectorstores import Chroma
-    from langchain.prompts import PromptTemplate
-    from langchain_core.output_parsers import StrOutputParser
-    from langchain_core.runnables import RunnablePassthrough
-    from langchain_core.documents import Document
+    from config import (
+        OPENROUTER_API_KEY, OPENROUTER_BASE_URL, 
+        EMBEDDING_MODEL, CHAT_MODELS, DEFAULT_CHAT_MODEL,
+        CHROMA_PATH, RETRIEVAL_SETTINGS, validate_config
+    )
 except ImportError as e:
-    st.error(f"Missing required dependencies: {e}")
-    st.info("Please install: pip install langchain langchain-openai langchain-community chromadb")
-    st.stop()
-
-# Configuration - Direct definitions to avoid import issues
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-
-CHAT_MODELS = {
-    "mistral": "mistralai/mistral-7b-instruct",
-    "llama": "meta-llama/llama-3-8b-instruct",
-    "gpt": "openai/gpt-3.5-turbo",
-    "claude": "anthropic/claude-3-haiku",
-    "gemini": "google/gemini-pro"
-}
-
-DEFAULT_CHAT_MODEL = "mistralai/mistral-7b-instruct"
-CHROMA_PATH = "./chroma_db"
-
-RETRIEVAL_SETTINGS = {
-    "search_type": "similarity_score_threshold",
-    "k": 5,
-    "score_threshold": 0.5
-}
-
-def validate_config():
-    """Validate configuration settings"""
-    if not OPENROUTER_API_KEY:
-        # Check Streamlit secrets
-        try:
-            api_key = st.secrets["OPENROUTER_API_KEY"]
-            return api_key
-        except:
-            raise ValueError("❌ OPENROUTER_API_KEY is required. Please set it in Streamlit secrets or .env file.")
-    return OPENROUTER_API_KEY
+    print(f"⚠️  Warning: Could not import config.py: {e}")
+    print("🔧 Using fallback configuration...")
+    
+    # Fallback configuration
+    OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+    OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+    EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+    CHAT_MODELS = {
+        "mistral": "mistralai/mistral-7b-instruct",
+        "llama": "meta-llama/llama-3-8b-instruct",
+        "gpt": "openai/gpt-3.5-turbo"
+    }
+    DEFAULT_CHAT_MODEL = "mistralai/mistral-7b-instruct"
+    CHROMA_PATH = "./chroma_db"
+    RETRIEVAL_SETTINGS = {
+        "search_type": "similarity_score_threshold",
+        "k": 5,
+        "score_threshold": 0.5
+    }
+    
+    def validate_config():
+        if not OPENROUTER_API_KEY:
+            raise ValueError("OPENROUTER_API_KEY is required")
+        return True
 
 class EnhancedRAGPipeline:
     def __init__(self, model_name: str = None):
+        # Use fallback if model_name is None
         if model_name is None:
             model_name = DEFAULT_CHAT_MODEL
             
-        # Validate and get API key
-        self.api_key = validate_config()
+        try:
+            validate_config()
+        except Exception as e:
+            print(f"❌ Configuration validation failed: {e}")
+            raise
+            
         self.model_name = model_name
-        
-        # Initialize components
         self.setup_embeddings()
         self.setup_vectorstore()
         self.setup_llm()
@@ -74,7 +70,6 @@ class EnhancedRAGPipeline:
         self.setup_chains()
 
     def setup_embeddings(self):
-        """Initialize embedding model"""
         try:
             self.embedding = HuggingFaceEmbeddings(
                 model_name=EMBEDDING_MODEL,
@@ -83,53 +78,39 @@ class EnhancedRAGPipeline:
             )
             print(f"✅ Loaded embeddings: {EMBEDDING_MODEL}")
         except Exception as e:
-            raise Exception(f"Failed to load embeddings: {e}")
+            print(f"❌ Failed to load embeddings: {e}")
+            raise
 
     def setup_vectorstore(self):
-        """Initialize vector store"""
-        # Check multiple possible locations for the vector store
-        possible_paths = [
-            CHROMA_PATH,
-            "./chroma_db",
-            "chroma_db",
-            os.path.join(os.getcwd(), "chroma_db")
-        ]
-        
-        vector_store_path = None
-        for path in possible_paths:
-            if os.path.exists(path):
-                vector_store_path = path
-                break
-        
-        if not vector_store_path:
-            raise FileNotFoundError(f"❌ Vector store not found. Checked paths: {possible_paths}")
+        if not os.path.exists(CHROMA_PATH):
+            raise FileNotFoundError(f"❌ Vector store not found at {CHROMA_PATH}. Please run create_database.py first.")
         
         try:
             self.vectorstore = Chroma(
-                persist_directory=vector_store_path,
+                persist_directory=CHROMA_PATH,
                 embedding_function=self.embedding
             )
             count = self.vectorstore._collection.count()
-            print(f"✅ Loaded vector store from {vector_store_path} with {count} documents")
+            print(f"✅ Loaded vector store with {count} documents")
         except Exception as e:
-            raise Exception(f"Failed to load vector store: {e}")
+            print(f"❌ Failed to load vector store: {e}")
+            raise
 
     def setup_llm(self):
-        """Initialize language model"""
         try:
             self.llm = ChatOpenAI(
                 model=self.model_name,
                 temperature=0.0,
-                openai_api_key=self.api_key,
+                openai_api_key=OPENROUTER_API_KEY,
                 openai_api_base=OPENROUTER_BASE_URL,
                 max_tokens=1000
             )
             print(f"✅ Initialized LLM: {self.model_name}")
         except Exception as e:
-            raise Exception(f"Failed to initialize LLM: {e}")
+            print(f"❌ Failed to initialize LLM: {e}")
+            raise
 
     def setup_retriever(self):
-        """Initialize retriever"""
         try:
             self.retriever = self.vectorstore.as_retriever(
                 search_type=RETRIEVAL_SETTINGS["search_type"],
@@ -140,10 +121,10 @@ class EnhancedRAGPipeline:
             )
             print(f"✅ Configured retriever with k={RETRIEVAL_SETTINGS['k']}")
         except Exception as e:
-            raise Exception(f"Failed to setup retriever: {e}")
+            print(f"❌ Failed to setup retriever: {e}")
+            raise
 
     def setup_prompts(self):
-        """Initialize prompt templates"""
         self.legal_prompt_template = """You are Nayya, a specialized legal assistant for Women's Rights and Domestic Violence Act. You provide detailed legal information for professionals.
 
 CONTEXT:
@@ -194,7 +175,6 @@ SIMPLE EXPLANATION:"""
         )
 
     def setup_chains(self):
-        """Initialize processing chains"""
         def format_docs(docs):
             return "\n\n".join(doc.page_content for doc in docs)
 
@@ -213,21 +193,20 @@ SIMPLE EXPLANATION:"""
         )
 
     def query_legal(self, question: str) -> str:
-        """Query in legal mode"""
         try:
             return self.legal_chain.invoke(question)
         except Exception as e:
+            print(f"❌ Error in legal query: {e}")
             return f"❌ Error processing legal query: {str(e)}"
 
     def query_summary(self, question: str) -> str:
-        """Query in summary mode"""
         try:
             return self.summary_chain.invoke(question)
         except Exception as e:
+            print(f"❌ Error in summary query: {e}")
             return f"❌ Error processing summary query: {str(e)}"
 
     def get_sources(self, question: str) -> List[Document]:
-        """Get relevant sources for a question"""
         try:
             return self.retriever.get_relevant_documents(question)
         except Exception as e:
@@ -235,17 +214,17 @@ SIMPLE EXPLANATION:"""
             return []
 
     def query_with_sources(self, question: str, mode: str = "legal") -> Dict[str, Any]:
-        """Query with source information"""
         start_time = time.time()
         
         try:
             sources = self.get_sources(question)
             
             context = "\n\n".join(doc.page_content for doc in sources)
-            
+            print(f"\n🧠 [DEBUG] Model context:\n{context[:500]}...\n")  # Show first 500 characters
+
             if not context.strip():
                 return {
-                    "answer": "📘 I don't have enough information from the provided documents to answer your question.",
+                    "answer": "📘 Answer: I don't have enough information from the provided documents to answer your question.",
                     "sources": [],
                     "processing_time": time.time() - start_time,
                     "model": self.model_name,
@@ -253,7 +232,6 @@ SIMPLE EXPLANATION:"""
                 }
 
             answer = self.query_legal(question) if mode == "legal" else self.query_summary(question)
-            
             return {
                 "answer": answer,
                 "sources": sources,
@@ -270,20 +248,63 @@ SIMPLE EXPLANATION:"""
                 "mode": mode
             }
 
-# Interactive mode for testing
-if __name__ == "__main__":
+# 👇 INTERACTIVE MODE INCLUDED BELOW 👇
+
+def interactive_query():
     print("🟢 Enhanced RAG Pipeline for Women's Rights & Domestic Violence Act")
     print("=" * 60)
-    
+
+    # Choose model
+    print("\n📋 Available Models:")
+    for key, model in CHAT_MODELS.items():
+        print(f"   {key}: {model}")
+    model_choice = input(f"\n🤖 Select model (default: mistral): ").strip().lower()
+    selected_model = CHAT_MODELS.get(model_choice, DEFAULT_CHAT_MODEL)
+
     try:
-        rag = EnhancedRAGPipeline()
-        print("✅ Pipeline initialized successfully!")
-        
-        # Test query
-        test_query = "What is domestic violence?"
-        result = rag.query_with_sources(test_query)
-        print(f"\n📘 Test Query: {test_query}")
-        print(f"📋 Answer: {result['answer'][:200]}...")
-        
+        print(f"\n🔧 Initializing RAG pipeline with model: {selected_model}...")
+        rag = EnhancedRAGPipeline(selected_model)
+        print("\n✅ Ready! Ask your legal questions (type 'exit' to quit)")
+        print("💡 Commands:")
+        print("   • 'legal: <question>' - Detailed legal analysis")
+        print("   • 'summary: <question>' - Concise summary")
+        print("   • 'sources: <question>' - Show source documents")
+        print("   • '<question>' - Default legal mode")
+
+        while True:
+            query = input("\n❓ You: ").strip()
+            if query.lower() in ["exit", "quit"]:
+                print("👋 Goodbye!")
+                break
+            if not query:
+                continue
+
+            try:
+                if query.startswith("legal:"):
+                    mode = "legal"
+                    question = query[len("legal:"):].strip()
+                elif query.startswith("summary:"):
+                    mode = "summary"
+                    question = query[len("summary:"):].strip()
+                elif query.startswith("sources:"):
+                    sources = rag.get_sources(query[len("sources:"):].strip())
+                    print(f"\n📚 Found {len(sources)} relevant sources:")
+                    for i, doc in enumerate(sources, 1):
+                        print(f"\n--- Source {i} ---\n{doc.page_content[:500]}")
+                    continue
+                else:
+                    mode = "legal"
+                    question = query
+
+                result = rag.query_with_sources(question, mode)
+                print(f"\n📘 Answer ({mode} mode):\n{result['answer']}")
+                print(f"\n⏱️  Processing time: {result['processing_time']:.2f}s")
+                print(f"🤖 Model: {result['model']}")
+                print(f"📄 Sources: {len(result['sources'])} documents")
+            except Exception as e:
+                print(f"❌ Error: {str(e)}")
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Failed to initialize pipeline: {str(e)}")
+
+if __name__ == "__main__":
+    interactive_query()

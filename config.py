@@ -1,6 +1,4 @@
-"""
-Configuration file for OpenRouter RAG pipeline
-"""
+# config.py
 
 import os
 from dotenv import load_dotenv
@@ -8,53 +6,60 @@ from dotenv import load_dotenv
 # Load environment variables
 load_dotenv()
 
-# 🔐 OpenRouter Configuration
-OPENROUTER_API_KEY = os.getenv("OPENAI_API_KEY")  # OpenRouter uses OpenAI-style keys
-OPENROUTER_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")  # Default fallback
+# API Configuration
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-# 🤗 Local Embedding Model
-EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"  # 384-dim embeddings
+# Embedding Model
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
-# 💬 Supported Chat Models via OpenRouter
+# Chat Models
 CHAT_MODELS = {
     "mistral": "mistralai/mistral-7b-instruct",
-    "mixtral": "mistralai/mixtral-8x7b-instruct",
-    "gpt-3.5": "openai/gpt-3.5-turbo",
-    "gpt-4": "openai/gpt-4-turbo",
+    "llama": "meta-llama/llama-3-8b-instruct",
+    "gpt": "openai/gpt-3.5-turbo",
     "claude": "anthropic/claude-3-haiku",
-    "llama": "meta-llama/llama-3.1-8b-instruct"
+    "gemini": "google/gemini-pro"
 }
 
-# 🎯 Default Model
-DEFAULT_CHAT_MODEL = CHAT_MODELS["mistral"]
+# Default model
+DEFAULT_CHAT_MODEL = "mistralai/mistral-7b-instruct"
 
-# 📂 Vector Store & Data
-CHROMA_PATH = "chroma_store"
-PDF_FILE = "data/Womenrights.pdf"
+# Vector Store Configuration
+CHROMA_PATH = "./chroma_db"
 
-# 🔎 Retrieval Settings
+# Retrieval Settings
 RETRIEVAL_SETTINGS = {
     "search_type": "similarity_score_threshold",
     "k": 5,
-    "score_threshold": 0.05  # Lowered for better recall on small corpus
+    "score_threshold": 0.5
 }
 
-# ✂️ Text Split Settings
-TEXT_SPLIT_SETTINGS = {
-    "chunk_size": 500,
-    "chunk_overlap": 100,
-    "separators": ["\n\n", "\n", ".", " ", ""]
-}
-
-# ✅ Config Validator
+# Validation function
 def validate_config():
+    """Validate configuration settings"""
     if not OPENROUTER_API_KEY:
-        raise ValueError("❌ OPENAI_API_KEY not found. Set it in .env or Streamlit secrets.")
-    if not os.path.exists(PDF_FILE):
-        raise FileNotFoundError(f"❌ PDF file missing: {PDF_FILE}")
-    print("✅ Configuration validated successfully")
+        raise ValueError("❌ OPENROUTER_API_KEY is required. Please set it in your .env file.")
+    
+    if not os.path.exists(CHROMA_PATH):
+        raise FileNotFoundError(f"❌ Vector store not found at {CHROMA_PATH}. Please run create_database.py first.")
+    
     return True
 
-# Optional manual test
+# Debug function
+def print_config():
+    """Print current configuration (for debugging)"""
+    print("🔧 Current Configuration:")
+    print(f"   OPENROUTER_API_KEY: {'✅ Set' if OPENROUTER_API_KEY else '❌ Not set'}")
+    print(f"   EMBEDDING_MODEL: {EMBEDDING_MODEL}")
+    print(f"   DEFAULT_CHAT_MODEL: {DEFAULT_CHAT_MODEL}")
+    print(f"   CHROMA_PATH: {CHROMA_PATH}")
+    print(f"   RETRIEVAL_SETTINGS: {RETRIEVAL_SETTINGS}")
+
 if __name__ == "__main__":
-    validate_config()
+    print_config()
+    try:
+        validate_config()
+        print("✅ Configuration is valid!")
+    except Exception as e:
+        print(f"❌ Configuration error: {e}")

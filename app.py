@@ -5,16 +5,14 @@ import time
 from datetime import datetime
 from dotenv import load_dotenv
 import os
+import sys
+import traceback
 
-load_dotenv()  # 💥 THIS IS ESSENTIAL
+# Load environment variables first
+load_dotenv()
 
-
-# Safe import with error handling
-try:
-    from query_database import EnhancedRAGPipeline, CHAT_MODELS
-except Exception as e:
-    st.error(f"❌ Failed to import RAG pipeline: {e}")
-    st.stop()
+# Add current directory to Python path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # Page configuration
 st.set_page_config(
@@ -23,6 +21,64 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# Safe import with detailed error handling
+def safe_import_rag():
+    try:
+        # Try to import the module
+        from query_database import EnhancedRAGPipeline
+        
+        # Try to import CHAT_MODELS, with fallback
+        try:
+            from query_database import CHAT_MODELS
+        except ImportError:
+            # Fallback CHAT_MODELS if not available
+            CHAT_MODELS = {
+                "mistral": "mistralai/mistral-7b-instruct",
+                "llama": "meta-llama/llama-3-8b-instruct",
+                "gpt": "openai/gpt-3.5-turbo"
+            }
+        
+        return EnhancedRAGPipeline, CHAT_MODELS, None
+    except Exception as e:
+        error_details = f"Error importing RAG pipeline: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+        return None, None, error_details
+
+# Try to import RAG pipeline
+EnhancedRAGPipeline, CHAT_MODELS, import_error = safe_import_rag()
+
+# If import failed, show error and provide debug info
+if import_error:
+    st.error("❌ Failed to import RAG pipeline")
+    
+    with st.expander("🔍 Debug Information"):
+        st.text(import_error)
+        
+        st.write("**Files in current directory:**")
+        try:
+            files = os.listdir(".")
+            for file in files:
+                st.write(f"- {file}")
+        except Exception as e:
+            st.write(f"Could not list files: {e}")
+        
+        st.write("**Environment variables:**")
+        st.write(f"- OPENROUTER_API_KEY: {'✅ Set' if os.getenv('OPENROUTER_API_KEY') else '❌ Not set'}")
+        
+        st.write("**Python path:**")
+        for path in sys.path:
+            st.write(f"- {path}")
+    
+    st.info("Please check that all required files are uploaded and environment variables are set in Streamlit secrets.")
+    st.stop()
+
+# Initialize CHAT_MODELS if not available
+if not CHAT_MODELS:
+    CHAT_MODELS = {
+        "mistral": "mistralai/mistral-7b-instruct",
+        "llama": "meta-llama/llama-3-8b-instruct",
+        "gpt": "openai/gpt-3.5-turbo"
+    }
 
 # Custom CSS for professional styling
 st.markdown("""
@@ -159,26 +215,62 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
+# Function to initialize pipeline safely
+@st.cache_resource
+def initialize_pipeline():
+    try:
+        # Get the first available model
+        first_model = list(CHAT_MODELS.values())[0]
+        pipeline = EnhancedRAGPipeline(first_model)
+        return pipeline, None
+    except Exception as e:
+        error_msg = f"Failed to initialize pipeline: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
+        return None, error_msg
+
 # Initialize session state
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
+
+# Try to initialize pipeline
 if "pipeline" not in st.session_state:
-    try:
-        st.session_state.pipeline = EnhancedRAGPipeline(CHAT_MODELS[list(CHAT_MODELS.keys())[0]])
-    except Exception as e:
-        st.error(f"❌ Failed to initialize pipeline: {e}")
-        st.stop()
+    with st.spinner("🔧 Initializing AI system..."):
+        pipeline, pipeline_error = initialize_pipeline()
+        
+        if pipeline_error:
+            st.error("❌ Failed to initialize AI pipeline")
+            with st.expander("🔍 Pipeline Error Details"):
+                st.text(pipeline_error)
+            st.stop()
+        else:
+            st.session_state.pipeline = pipeline
+            st.success("✅ AI system initialized successfully!")
 
 # Sidebar for settings
 with st.sidebar:
     st.title("⚙️ Settings")
+    
+    # Model selection
     model_key = st.selectbox("AI Model", list(CHAT_MODELS.keys()), index=0)
+    
+    # Model change button
+    if st.button("🔄 Change Model"):
+        try:
+            with st.spinner("🔧 Switching model..."):
+                new_pipeline = EnhancedRAGPipeline(CHAT_MODELS[model_key])
+                st.session_state.pipeline = new_pipeline
+                st.success(f"✅ Switched to {model_key}")
+        except Exception as e:
+            st.error(f"❌ Failed to switch model: {e}")
     
     if st.button("🔄 Reset Chat"):
         st.session_state.chat_history = []
         st.rerun()
     
-    # Emergency contacts are always visible in the sidebar
+    # Show current model info
+    if hasattr(st.session_state.pipeline, 'model_name'):
+        st.info(f"Current model: {st.session_state.pipeline.model_name}")
+    
+    # Emergency contacts
     st.markdown("---")
     st.markdown("### 📞 Emergency Contacts")
     st.markdown("""
@@ -221,24 +313,29 @@ with col1:
         for i, question in enumerate(suggested_questions):
             with cols[i % 2]:
                 if st.button(f"💬 {question}", key=f"suggest_{i}", use_container_width=True):
-                    # Process the question immediately
+                    # Process the question
                     st.session_state.chat_history.append({"role": "user", "content": question})
                     
                     # Generate response
-                    with st.spinner("🤔 Analyzing your question..."):
-                        result = st.session_state.pipeline.query_with_sources(
-                            question,
-                            mode="legal"
-                        )
-                    
-                    # Add bot response to history - CLEANED VERSION
-                    response_content = f"""{result["answer"]}
+                    try:
+                        with st.spinner("🤔 Analyzing your question..."):
+                            result = st.session_state.pipeline.query_with_sources(
+                                question,
+                                mode="legal"
+                            )
+                        
+                        # Add bot response to history
+                        response_content = f"""{result["answer"]}
 
 ---
 ⏱️ **Response time:** {result['processing_time']:.2f}s  
 📄 **Sources consulted:** {len(result['sources'])} legal documents"""
+                        
+                        st.session_state.chat_history.append({"role": "assistant", "content": response_content})
+                    except Exception as e:
+                        error_response = f"❌ Sorry, I encountered an error processing your question: {str(e)}"
+                        st.session_state.chat_history.append({"role": "assistant", "content": error_response})
                     
-                    st.session_state.chat_history.append({"role": "assistant", "content": response_content})
                     st.rerun()
     
     # Chat Interface
@@ -257,7 +354,7 @@ with col1:
                     </div>
                     """, unsafe_allow_html=True)
                 else:
-                    # Clean the message content to remove any HTML tags
+                    # Clean the message content
                     clean_content = message["content"].replace("<", "&lt;").replace(">", "&gt;")
                     st.markdown(f"""
                     <div class="bot-message">
@@ -284,20 +381,25 @@ with col1:
         st.session_state.chat_history.append({"role": "user", "content": user_input})
         
         # Generate response
-        with st.spinner("🤔 Analyzing your question..."):
-            result = st.session_state.pipeline.query_with_sources(
-                user_input,
-                mode="legal"
-            )
-        
-        # Add bot response to history - CLEANED VERSION
-        response_content = f"""{result["answer"]}
+        try:
+            with st.spinner("🤔 Analyzing your question..."):
+                result = st.session_state.pipeline.query_with_sources(
+                    user_input,
+                    mode="legal"
+                )
+            
+            # Add bot response to history
+            response_content = f"""{result["answer"]}
 
 ---
 ⏱️ **Response time:** {result['processing_time']:.2f}s  
 📄 **Sources consulted:** {len(result['sources'])} legal documents"""
+            
+            st.session_state.chat_history.append({"role": "assistant", "content": response_content})
+        except Exception as e:
+            error_response = f"❌ Sorry, I encountered an error processing your question: {str(e)}"
+            st.session_state.chat_history.append({"role": "assistant", "content": error_response})
         
-        st.session_state.chat_history.append({"role": "assistant", "content": response_content})
         st.rerun()
 
 with col2:
