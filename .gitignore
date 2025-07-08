@@ -1,11 +1,19 @@
-# Ignore Python envs
+# ⛔ Do NOT commit virtual environments
 venv/
 env/
+rag-env/
 
-# Ignore OS junk
+# ⛔ Do NOT commit Python cache files
+__pycache__/
+*.pyc
+
+# ⛔ Do NOT commit environment or secrets
+.env
+
+# ⛔ Do NOT commit OS/system files
 .DS_Store
 
-# Ignore logs and data
+# ⛔ Do NOT commit logs, datasets, or binary artifacts
 *.log
 *.csv
 *.db
@@ -13,25 +21,8 @@ env/
 *.pkl
 *.pt
 *.h5
-
-# Ignore model files
 *.bin
 *.weights
 
-# Ignore node_modules
-node_modules/
-
-# Ignore compiled files
-__pycache__/
-*.pyc
-
-rag-env/
-
-__pycache__/
-*.pyc
-*.log
-*.pkl
-*.csv
-*.db
-*.sqlite
+# ⛔ Do NOT commit frontend/node files (if any)
 node_modules/

@@ -3,6 +3,11 @@
 import streamlit as st
 import time
 from datetime import datetime
+from dotenv import load_dotenv
+import os
+
+load_dotenv()  # 💥 THIS IS ESSENTIAL
+
 
 # Safe import with error handling
 try:
