@@ -9,14 +9,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # 🔐 OpenRouter Configuration
-OPENROUTER_API_KEY = os.getenv("OPENAI_API_KEY")  # OpenRouter uses OPENAI_API_KEY format
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+OPENROUTER_API_KEY = os.getenv("OPENAI_API_KEY")  # OpenRouter uses OpenAI-style keys
+OPENROUTER_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")  # Default fallback
 
-# 🤗 Local Embedding Model (used for vector DB)
-EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"  # Output size: 384
-  # ✅ Stronger semantic understanding than MiniLM
-# Or fallback:
-# EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+# 🤗 Local Embedding Model
+EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"  # 384-dim embeddings
 
 # 💬 Supported Chat Models via OpenRouter
 CHAT_MODELS = {
@@ -31,7 +28,7 @@ CHAT_MODELS = {
 # 🎯 Default Model
 DEFAULT_CHAT_MODEL = CHAT_MODELS["mistral"]
 
-# 📂 Vector Store & PDF Configuration
+# 📂 Vector Store & Data
 CHROMA_PATH = "chroma_store"
 PDF_FILE = "data/Womenrights.pdf"
 
@@ -39,27 +36,25 @@ PDF_FILE = "data/Womenrights.pdf"
 RETRIEVAL_SETTINGS = {
     "search_type": "similarity_score_threshold",
     "k": 5,
-    "score_threshold": 0.05  # ✅ Lowered from 0.2 to 0.1 for better matching in small corpus
+    "score_threshold": 0.05  # Lowered for better recall on small corpus
 }
 
-# ✂️ Text Splitting Settings
+# ✂️ Text Split Settings
 TEXT_SPLIT_SETTINGS = {
     "chunk_size": 500,
     "chunk_overlap": 100,
     "separators": ["\n\n", "\n", ".", " ", ""]
 }
 
-# ✅ Configuration Validator
+# ✅ Config Validator
 def validate_config():
-    """Validate that required configuration is present"""
     if not OPENROUTER_API_KEY:
-        raise ValueError("❌ OPENAI_API_KEY not found in environment variables. Please set your OpenRouter API key.")
-    
+        raise ValueError("❌ OPENAI_API_KEY not found. Set it in .env or Streamlit secrets.")
     if not os.path.exists(PDF_FILE):
-        raise FileNotFoundError(f"❌ PDF file not found: {PDF_FILE}")
-    
+        raise FileNotFoundError(f"❌ PDF file missing: {PDF_FILE}")
     print("✅ Configuration validated successfully")
     return True
 
+# Optional manual test
 if __name__ == "__main__":
     validate_config()

@@ -13,13 +13,22 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.documents import Document
 
-from config import (
-    OPENROUTER_API_KEY, OPENROUTER_BASE_URL, 
-    EMBEDDING_MODEL, CHAT_MODELS, DEFAULT_CHAT_MODEL,
-    CHROMA_PATH, RETRIEVAL_SETTINGS, validate_config
-)
+import os
+from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv()  # ✅ Needed locally (has no effect in Streamlit Cloud)
+
+# ✅ Load from environment variables or Streamlit secrets
+OPENROUTER_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENROUTER_BASE_URL = os.getenv("OPENAI_BASE_URL")
+
+# ✅ Add this check
+if not OPENROUTER_API_KEY:
+    raise ValueError("❌ OPENAI_API_KEY not found in environment variables. Please set your OpenRouter API key.")
+
+if not OPENROUTER_BASE_URL:
+    raise ValueError("❌ OPENAI_BASE_URL not found in environment variables. Please set your OpenRouter base URL.")
+
 
 class EnhancedRAGPipeline:
     def __init__(self, model_name: str = DEFAULT_CHAT_MODEL):
