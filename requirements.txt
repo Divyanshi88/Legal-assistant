@@ -21,18 +21,15 @@ tiktoken>=0.5.0
 # Utilities
 python-dotenv>=1.0.0
 numpy>=1.24.0
-requests>=2.31.0
-pandas==2.0.3
 requests==2.31.0
+pandas==2.0.3
 urllib3==2.0.7
 pydantic==2.5.0
 faiss-cpu==1.7.4
 huggingface-hub==0.20.1
-transformers==4.36.2
-torch==2.1.2
 tokenizers==0.15.0
 
 # Streamlit & Related
 streamlit>=1.25.0
-streamlit-chat>=0.0.2  # or match the version you're using
-watchdog>=3.0.0        # file monitoring in Streamlit Cloud
+streamlit-chat>=0.0.2
+watchdog>=3.0.0
