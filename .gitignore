@@ -1,0 +1,37 @@
+# Ignore Python envs
+venv/
+env/
+
+# Ignore OS junk
+.DS_Store
+
+# Ignore logs and data
+*.log
+*.csv
+*.db
+*.sqlite
+*.pkl
+*.pt
+*.h5
+
+# Ignore model files
+*.bin
+*.weights
+
+# Ignore node_modules
+node_modules/
+
+# Ignore compiled files
+__pycache__/
+*.pyc
+
+rag-env/
+
+__pycache__/
+*.pyc
+*.log
+*.pkl
+*.csv
+*.db
+*.sqlite
+node_modules/

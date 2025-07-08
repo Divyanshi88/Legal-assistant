@@ -1,0 +1,32 @@
+# Core dependencies
+langchain>=0.1.0
+langchain-openai>=0.1.0
+langchain-community>=0.1.0
+langchain-core>=0.1.0
+
+# Vector store
+chromadb>=0.4.0
+
+# PDF processing
+pypdf>=4.0.0
+
+# Environment management
+python-dotenv>=1.0.0
+
+# OpenAI (for OpenRouter compatibility)
+openai>=1.0.0
+
+# Additional utilities
+tiktoken>=0.5.0  # For token counting
+numpy>=1.24.0    # For numerical operations
+
+# Local embedding models (since OpenRouter doesn't support embeddings)
+sentence-transformers>=2.2.0  # For local embeddings
+torch>=1.13.0     # Required for sentence-transformers
+streamlit
+langchain
+langchain-community
+langchain-openai
+chromadb
+sentence-transformers
+python-dotenv
