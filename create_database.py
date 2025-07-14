@@ -1,7 +1,6 @@
 import os
 import shutil
 import re
-from dotenv import load_dotenv
 
 from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -10,8 +9,14 @@ from langchain.schema import Document
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
 
-# Load environment variables
-load_dotenv()
+# Load environment variables with fallback for deployment
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # If dotenv is not available (e.g., in some deployment environments)
+    # Environment variables should be set directly in the deployment platform
+    pass
 
 # 📂 File and folder paths
 PDF_FILE = "data/Womenrights.pdf"

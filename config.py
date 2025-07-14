@@ -1,10 +1,15 @@
 # config.py
 
 import os
-from dotenv import load_dotenv
 
-# Load environment variables
-load_dotenv()
+# Load environment variables with fallback for deployment
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # If dotenv is not available (e.g., in some deployment environments)
+    # Environment variables should be set directly in the deployment platform
+    pass
 
 # API Configuration
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
@@ -26,7 +31,7 @@ CHAT_MODELS = {
 DEFAULT_CHAT_MODEL = "mistralai/mistral-7b-instruct"
 
 # Vector Store Configuration
-CHROMA_PATH = "./chroma_db"
+CHROMA_PATH = "chroma_store"
 
 # Retrieval Settings
 RETRIEVAL_SETTINGS = {

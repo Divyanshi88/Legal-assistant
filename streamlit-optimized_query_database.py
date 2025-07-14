@@ -3,7 +3,9 @@
 import os
 import time
 from typing import List, Dict, Any
-from dotenv import load_dotenv
+import os
+port = int(os.getenv("PORT", 8501))
+
 
 from langchain_openai import ChatOpenAI
 from langchain_community.embeddings import HuggingFaceEmbeddings
@@ -13,8 +15,14 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.documents import Document
 
-# Load environment variables first
-load_dotenv()
+# Load environment variables with fallback for deployment
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # If dotenv is not available (e.g., in some deployment environments)
+    # Environment variables should be set directly in the deployment platform
+    pass
 
 # Try to import config, with fallback defaults
 try:

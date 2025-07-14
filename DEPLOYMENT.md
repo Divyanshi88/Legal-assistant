@@ -12,12 +12,15 @@
 - ✅ Fixed to specify Python version: `python-3.9.19`
 - ✅ Removed incorrect package specifications
 
-### 3. app.py
-- ✅ Added graceful fallback for dotenv import
+### 3. Python Files (app.py, config.py, query_database.py, etc.)
+- ✅ Added graceful fallback for dotenv import in ALL Python files
 - ✅ Environment variables will work with Streamlit Cloud secrets
+- ✅ Fixed import errors that were causing deployment failures
 
 ### 4. .streamlit/config.toml
 - ✅ Added proper Streamlit configuration for deployment
+- ✅ Fixed TOML syntax error (removed invalid $PORT variable)
+- ✅ Removed conflicting .streamlit/runtime.txt file
 
 ## Deployment Steps
 

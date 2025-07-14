@@ -3,11 +3,16 @@
 import os
 import time
 from typing import List, Dict, Any
-from dotenv import load_dotenv
 import streamlit as st
 
-# Load environment variables
-load_dotenv()
+# Load environment variables with fallback for deployment
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # If dotenv is not available (e.g., in some deployment environments)
+    # Environment variables should be set directly in the deployment platform
+    pass
 
 # Import dependencies with error handling
 try:
@@ -37,7 +42,7 @@ CHAT_MODELS = {
 }
 
 DEFAULT_CHAT_MODEL = "mistralai/mistral-7b-instruct"
-CHROMA_PATH = "./chroma_db"
+CHROMA_PATH = "chroma_store"
 
 RETRIEVAL_SETTINGS = {
     "search_type": "similarity_score_threshold",
