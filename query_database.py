@@ -5,6 +5,9 @@ import time
 from typing import List, Dict, Any
 import streamlit as st
 
+import os
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
 # Load environment variables with fallback for deployment
 try:
     from dotenv import load_dotenv
@@ -42,7 +45,7 @@ CHAT_MODELS = {
 }
 
 DEFAULT_CHAT_MODEL = "mistralai/mistral-7b-instruct"
-CHROMA_PATH = "chroma_store"
+CHROMA_PATH = "chroma_db"
 
 RETRIEVAL_SETTINGS = {
     "search_type": "similarity_score_threshold",
@@ -95,7 +98,6 @@ class EnhancedRAGPipeline:
         # Check multiple possible locations for the vector store
         possible_paths = [
             CHROMA_PATH,
-            "./chroma_db",
             "chroma_db",
             os.path.join(os.getcwd(), "chroma_db")
         ]

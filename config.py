@@ -31,7 +31,7 @@ CHAT_MODELS = {
 DEFAULT_CHAT_MODEL = "mistralai/mistral-7b-instruct"
 
 # Vector Store Configuration
-CHROMA_PATH = "chroma_store"
+CHROMA_PATH = "chroma_db"
 
 # Retrieval Settings
 RETRIEVAL_SETTINGS = {

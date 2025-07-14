@@ -20,7 +20,7 @@ except ImportError:
 
 # 📂 File and folder paths
 PDF_FILE = "data/Womenrights.pdf"
-CHROMA_PATH = "chroma_store"
+CHROMA_PATH = "chroma_db"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 
