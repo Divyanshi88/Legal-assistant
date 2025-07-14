@@ -1,3 +1,12 @@
+# Core Python utilities
+python-dotenv>=1.0.0
+typing-extensions>=4.5.0
+
+# Streamlit & Related
+streamlit>=1.28.0
+streamlit-chat>=0.1.1
+watchdog>=3.0.0
+
 # LangChain Core
 langchain>=0.1.0
 langchain-core>=0.1.0
@@ -10,6 +19,7 @@ chromadb>=0.4.0
 # Embedding Models
 sentence-transformers>=2.2.0
 torch>=1.13.0
+transformers>=4.21.0
 
 # PDF Processing
 pypdf>=4.0.0
@@ -18,22 +28,21 @@ pypdf>=4.0.0
 openai>=1.0.0
 tiktoken>=0.5.0
 
-# Utilities
-python-dotenv>=1.0.0
+# Data processing
 numpy>=1.24.0
-requests==2.31.0
-pandas==2.0.3
-urllib3==2.0.7
-pydantic==1.10.13
+pandas>=2.0.0
 
+# HTTP and utilities
+requests>=2.28.0
+urllib3>=1.26.0
 
-huggingface-hub==0.20.1
-tokenizers==0.15.0
+# Pydantic (compatible version)
+pydantic>=1.10.0,<2.0.0
 
-# Streamlit & Related
-streamlit>=1.25.0
-streamlit-chat>=0.0.2
-watchdog>=3.0.0
+# HuggingFace
+huggingface-hub>=0.16.0
+tokenizers>=0.13.0
 
-# temp fix to trigger build
-typing-extensions==4.10.0
+# Additional dependencies that might be needed
+protobuf>=3.20.0
+click>=8.0.0

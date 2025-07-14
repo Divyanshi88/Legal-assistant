@@ -3,13 +3,18 @@
 import streamlit as st
 import time
 from datetime import datetime
-from dotenv import load_dotenv
 import os
 import sys
 import traceback
 
-# Load environment variables first
-load_dotenv()
+# Load environment variables first (with fallback for deployment)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    # If dotenv is not available (e.g., in some deployment environments)
+    # Environment variables should be set directly in the deployment platform
+    pass
 
 # Add current directory to Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
