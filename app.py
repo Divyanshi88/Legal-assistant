@@ -236,8 +236,34 @@ def initialize_pipeline():
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
 
+if "pipeline_initialized" not in st.session_state:
+    st.session_state.pipeline_initialized = False
+
+# Function to handle question processing
+def process_question(question):
+    try:
+        with st.spinner("🤔 Analyzing your question..."):
+            result = st.session_state.pipeline.query_with_sources(
+                question,
+                mode="legal"
+            )
+        
+        # Add bot response to history
+        response_content = f"""{result["answer"]}
+
+---
+⏱️ **Response time:** {result['processing_time']:.2f}s  
+📄 **Sources consulted:** {len(result['sources'])} legal documents"""
+        
+        st.session_state.chat_history.append({"role": "assistant", "content": response_content})
+        return True
+    except Exception as e:
+        error_response = f"❌ Sorry, I encountered an error processing your question: {str(e)}"
+        st.session_state.chat_history.append({"role": "assistant", "content": error_response})
+        return False
+
 # Try to initialize pipeline
-if "pipeline" not in st.session_state:
+if not st.session_state.pipeline_initialized:
     with st.spinner("🔧 Initializing AI system..."):
         pipeline, pipeline_error = initialize_pipeline()
         
@@ -248,6 +274,7 @@ if "pipeline" not in st.session_state:
             st.stop()
         else:
             st.session_state.pipeline = pipeline
+            st.session_state.pipeline_initialized = True
             st.success("✅ AI system initialized successfully!")
 
 # Sidebar for settings
@@ -272,7 +299,7 @@ with st.sidebar:
         st.rerun()
     
     # Show current model info
-    if hasattr(st.session_state.pipeline, 'model_name'):
+    if hasattr(st.session_state, 'pipeline') and hasattr(st.session_state.pipeline, 'model_name'):
         st.info(f"Current model: {st.session_state.pipeline.model_name}")
     
     # Emergency contacts
@@ -318,29 +345,11 @@ with col1:
         for i, question in enumerate(suggested_questions):
             with cols[i % 2]:
                 if st.button(f"💬 {question}", key=f"suggest_{i}", use_container_width=True):
-                    # Process the question
+                    # Add user message to history
                     st.session_state.chat_history.append({"role": "user", "content": question})
                     
-                    # Generate response
-                    try:
-                        with st.spinner("🤔 Analyzing your question..."):
-                            result = st.session_state.pipeline.query_with_sources(
-                                question,
-                                mode="legal"
-                            )
-                        
-                        # Add bot response to history
-                        response_content = f"""{result["answer"]}
-
----
-⏱️ **Response time:** {result['processing_time']:.2f}s  
-📄 **Sources consulted:** {len(result['sources'])} legal documents"""
-                        
-                        st.session_state.chat_history.append({"role": "assistant", "content": response_content})
-                    except Exception as e:
-                        error_response = f"❌ Sorry, I encountered an error processing your question: {str(e)}"
-                        st.session_state.chat_history.append({"role": "assistant", "content": error_response})
-                    
+                    # Process the question
+                    process_question(question)
                     st.rerun()
     
     # Chat Interface
@@ -359,8 +368,8 @@ with col1:
                     </div>
                     """, unsafe_allow_html=True)
                 else:
-                    # Clean the message content
-                    clean_content = message["content"].replace("<", "&lt;").replace(">", "&gt;")
+                    # Clean the message content and preserve line breaks
+                    clean_content = message["content"].replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
                     st.markdown(f"""
                     <div class="bot-message">
                         <strong>🤖 Legal Assistant:</strong><br>
@@ -370,42 +379,25 @@ with col1:
     
     # Input area
     st.markdown("---")
-    user_input = st.text_input(
-        "💭 Ask your legal question here...",
-        placeholder="Type your question about domestic violence law...",
-        key="user_input"
-    )
     
-    col_send, col_clear = st.columns([1, 4])
-    with col_send:
-        send_button = st.button("📤 Send", type="primary", use_container_width=True)
-    
-    # Process user input
-    if send_button and user_input.strip():
-        # Add user message to history
-        st.session_state.chat_history.append({"role": "user", "content": user_input})
+    # Create a form for better input handling
+    with st.form(key="chat_form", clear_on_submit=True):
+        user_input = st.text_input(
+            "💭 Ask your legal question here...",
+            placeholder="Type your question about domestic violence law...",
+            key="user_input_form"
+        )
         
-        # Generate response
-        try:
-            with st.spinner("🤔 Analyzing your question..."):
-                result = st.session_state.pipeline.query_with_sources(
-                    user_input,
-                    mode="legal"
-                )
-            
-            # Add bot response to history
-            response_content = f"""{result["answer"]}
-
----
-⏱️ **Response time:** {result['processing_time']:.2f}s  
-📄 **Sources consulted:** {len(result['sources'])} legal documents"""
-            
-            st.session_state.chat_history.append({"role": "assistant", "content": response_content})
-        except Exception as e:
-            error_response = f"❌ Sorry, I encountered an error processing your question: {str(e)}"
-            st.session_state.chat_history.append({"role": "assistant", "content": error_response})
+        send_button = st.form_submit_button("📤 Send", type="primary", use_container_width=True)
         
-        st.rerun()
+        # Process user input
+        if send_button and user_input.strip():
+            # Add user message to history
+            st.session_state.chat_history.append({"role": "user", "content": user_input})
+            
+            # Process the question
+            process_question(user_input)
+            st.rerun()
 
 with col2:
     # Quick Actions

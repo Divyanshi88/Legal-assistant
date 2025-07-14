@@ -1,41 +1,50 @@
-# query_database.py - Streamlit optimized version
-
+# query_database.py - Streamlit optimized version using FAISS
 import os
 import time
 from typing import List, Dict, Any
 import streamlit as st
 
-import os
+from langchain_openai import ChatOpenAI
+from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.documents import Document  # 👈 THIS is critical
+
+
+# Prevent tokenizer parallelism warnings
 os.environ["TOKENIZERS_PARALLELISM"] = "false"
 
-# Load environment variables with fallback for deployment
+# Load environment variables
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    # If dotenv is not available (e.g., in some deployment environments)
-    # Environment variables should be set directly in the deployment platform
-    pass
+    pass  # If dotenv is not available
 
 # Import dependencies with error handling
 try:
     from langchain_openai import ChatOpenAI
-    from langchain_community.embeddings import HuggingFaceEmbeddings
-    from langchain_community.vectorstores import Chroma
+    from langchain_huggingface import HuggingFaceEmbeddings
+    from langchain_community.vectorstores import FAISS
     from langchain.prompts import PromptTemplate
     from langchain_core.output_parsers import StrOutputParser
     from langchain_core.runnables import RunnablePassthrough
     from langchain_core.documents import Document
 except ImportError as e:
+    import streamlit as st
     st.error(f"Missing required dependencies: {e}")
-    st.info("Please install: pip install langchain langchain-openai langchain-community chromadb")
+    st.info("Please install: pip install langchain langchain-openai langchain-community langchain-core langchain-huggingface faiss-cpu")
     st.stop()
 
-# Configuration - Direct definitions to avoid import issues
+# Configuration
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 HUGGINGFACEHUB_API_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+DEFAULT_CHAT_MODEL = "mistralai/mistral-7b-instruct"
+FAISS_INDEX_PATH = "faiss_index"
 
 CHAT_MODELS = {
     "mistral": "mistralai/mistral-7b-instruct",
@@ -45,9 +54,6 @@ CHAT_MODELS = {
     "gemini": "google/gemini-pro"
 }
 
-DEFAULT_CHAT_MODEL = "mistralai/mistral-7b-instruct"
-CHROMA_PATH = "chroma_db"
-
 RETRIEVAL_SETTINGS = {
     "search_type": "similarity_score_threshold",
     "k": 5,
@@ -55,26 +61,19 @@ RETRIEVAL_SETTINGS = {
 }
 
 def validate_config():
-    """Validate configuration settings"""
     if not OPENROUTER_API_KEY:
-        # Check Streamlit secrets
         try:
             api_key = st.secrets["OPENROUTER_API_KEY"]
             return api_key
         except:
-            raise ValueError("❌ OPENROUTER_API_KEY is required. Please set it in Streamlit secrets or .env file.")
+            raise ValueError("❌ OPENROUTER_API_KEY is required. Set it in Streamlit secrets or .env.")
     return OPENROUTER_API_KEY
 
 class EnhancedRAGPipeline:
     def __init__(self, model_name: str = None):
-        if model_name is None:
-            model_name = DEFAULT_CHAT_MODEL
-            
-        # Validate and get API key
         self.api_key = validate_config()
-        self.model_name = model_name
-        
-        # Initialize components
+        self.model_name = model_name or DEFAULT_CHAT_MODEL
+
         self.setup_embeddings()
         self.setup_vectorstore()
         self.setup_llm()
@@ -83,47 +82,41 @@ class EnhancedRAGPipeline:
         self.setup_chains()
 
     def setup_embeddings(self):
-        """Initialize embedding model"""
         try:
             self.embedding = HuggingFaceEmbeddings(
                 model_name=EMBEDDING_MODEL,
-                model_kwargs={'device': 'cpu'},
-                encode_kwargs={'normalize_embeddings': True}
+                model_kwargs={
+                    "device": "cpu"  # Use CPU by default, change to "cuda" if GPU available
+                },
+                encode_kwargs={"normalize_embeddings": True}
             )
             print(f"✅ Loaded embeddings: {EMBEDDING_MODEL}")
         except Exception as e:
-            raise Exception(f"Failed to load embeddings: {e}")
+            raise Exception(f"❌ Failed to load embeddings: {e}")
 
     def setup_vectorstore(self):
-        """Initialize vector store"""
-        # Check multiple possible locations for the vector store
         possible_paths = [
-            CHROMA_PATH,
-            "chroma_db",
-            os.path.join(os.getcwd(), "chroma_db")
+            FAISS_INDEX_PATH,
+            "faiss_index",
+            os.path.join(os.getcwd(), "faiss_index")
         ]
-        
-        vector_store_path = None
-        for path in possible_paths:
-            if os.path.exists(path):
-                vector_store_path = path
-                break
-        
+
+        vector_store_path = next((p for p in possible_paths if os.path.exists(p)), None)
+
         if not vector_store_path:
-            raise FileNotFoundError(f"❌ Vector store not found. Checked paths: {possible_paths}")
-        
+            raise FileNotFoundError(f"❌ FAISS vector store not found. Checked: {possible_paths}")
+
         try:
-            self.vectorstore = Chroma(
-                persist_directory=vector_store_path,
-                embedding_function=self.embedding
+            self.vectorstore = FAISS.load_local(
+                folder_path=vector_store_path,
+                embeddings=self.embedding,
+                allow_dangerous_deserialization=True
             )
-            count = self.vectorstore._collection.count()
-            print(f"✅ Loaded vector store from {vector_store_path} with {count} documents")
+            print(f"✅ Loaded FAISS vector store from {vector_store_path}")
         except Exception as e:
-            raise Exception(f"Failed to load vector store: {e}")
+            raise Exception(f"Failed to load FAISS vector store: {e}")
 
     def setup_llm(self):
-        """Initialize language model"""
         try:
             self.llm = ChatOpenAI(
                 model=self.model_name,
@@ -137,7 +130,6 @@ class EnhancedRAGPipeline:
             raise Exception(f"Failed to initialize LLM: {e}")
 
     def setup_retriever(self):
-        """Initialize retriever"""
         try:
             self.retriever = self.vectorstore.as_retriever(
                 search_type=RETRIEVAL_SETTINGS["search_type"],
@@ -151,7 +143,6 @@ class EnhancedRAGPipeline:
             raise Exception(f"Failed to setup retriever: {e}")
 
     def setup_prompts(self):
-        """Initialize prompt templates"""
         self.legal_prompt_template = """You are Nayya, a specialized legal assistant for Women's Rights and Domestic Violence Act. You provide detailed legal information for professionals.
 
 CONTEXT:
@@ -167,7 +158,6 @@ GUIDELINES:
 - Format responses professionally with proper legal language
 - If information is not in the context, respond with:
 "📘 I don't have enough information from the provided documents to answer your question specifically."
-- Always prioritize accuracy and legal precision
 
 DETAILED LEGAL ANSWER:"""
 
@@ -184,10 +174,8 @@ GUIDELINES:
 - Explain legal concepts in simple, easy-to-understand language
 - Avoid complex legal jargon - use everyday language
 - Be empathetic and supportive in tone
-- Provide practical, actionable guidance when possible
 - If information is not in the context, respond with:
-"📘 I don't have enough information from the provided documents to answer your question, but I encourage you to seek help from legal professionals or support services."
-- Focus on helping people understand their rights and options
+"📘 I don't have enough information from the provided documents to answer your question."
 
 SIMPLE EXPLANATION:"""
 
@@ -202,7 +190,6 @@ SIMPLE EXPLANATION:"""
         )
 
     def setup_chains(self):
-        """Initialize processing chains"""
         def format_docs(docs):
             return "\n\n".join(doc.page_content for doc in docs)
 
@@ -221,21 +208,18 @@ SIMPLE EXPLANATION:"""
         )
 
     def query_legal(self, question: str) -> str:
-        """Query in legal mode"""
         try:
             return self.legal_chain.invoke(question)
         except Exception as e:
             return f"❌ Error processing legal query: {str(e)}"
 
     def query_summary(self, question: str) -> str:
-        """Query in summary mode"""
         try:
             return self.summary_chain.invoke(question)
         except Exception as e:
             return f"❌ Error processing summary query: {str(e)}"
 
     def get_sources(self, question: str) -> List[Document]:
-        """Get relevant sources for a question"""
         try:
             return self.retriever.get_relevant_documents(question)
         except Exception as e:
@@ -243,14 +227,11 @@ SIMPLE EXPLANATION:"""
             return []
 
     def query_with_sources(self, question: str, mode: str = "legal") -> Dict[str, Any]:
-        """Query with source information"""
         start_time = time.time()
-        
         try:
             sources = self.get_sources(question)
-            
             context = "\n\n".join(doc.page_content for doc in sources)
-            
+
             if not context.strip():
                 return {
                     "answer": "📘 I don't have enough information from the provided documents to answer your question.",
@@ -261,7 +242,6 @@ SIMPLE EXPLANATION:"""
                 }
 
             answer = self.query_legal(question) if mode == "legal" else self.query_summary(question)
-            
             return {
                 "answer": answer,
                 "sources": sources,
@@ -278,20 +258,20 @@ SIMPLE EXPLANATION:"""
                 "mode": mode
             }
 
-# Interactive mode for testing
+
+# For standalone testing
 if __name__ == "__main__":
     print("🟢 Enhanced RAG Pipeline for Women's Rights & Domestic Violence Act")
     print("=" * 60)
-    
+
     try:
         rag = EnhancedRAGPipeline()
         print("✅ Pipeline initialized successfully!")
-        
-        # Test query
+
         test_query = "What is domestic violence?"
         result = rag.query_with_sources(test_query)
         print(f"\n📘 Test Query: {test_query}")
-        print(f"📋 Answer: {result['answer'][:200]}...")
-        
+        print(f"📋 Answer: {result['answer'][:300]}...")
+
     except Exception as e:
         print(f"❌ Error: {e}")

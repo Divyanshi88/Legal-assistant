@@ -6,21 +6,20 @@ from langchain_community.document_loaders import PyPDFLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.schema import Document
 
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
+from langchain_huggingface import HuggingFaceEmbeddings
+
+from langchain.vectorstores import FAISS
 
 # Load environment variables with fallback for deployment
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
-    # If dotenv is not available (e.g., in some deployment environments)
-    # Environment variables should be set directly in the deployment platform
     pass
 
 # 📂 File and folder paths
 PDF_FILE = "data/Womenrights.pdf"
-CHROMA_PATH = "chroma_db"
+FAISS_INDEX_PATH = "faiss_index"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
 
@@ -65,9 +64,9 @@ def split_text(documents: list[Document]):
     return processed_chunks
 
 
-def save_to_chroma(chunks: list[Document]):
-    if os.path.exists(CHROMA_PATH):
-        shutil.rmtree(CHROMA_PATH)
+def save_to_faiss(chunks: list[Document]):
+    if os.path.exists(FAISS_INDEX_PATH):
+        shutil.rmtree(FAISS_INDEX_PATH)
 
     embedding = HuggingFaceEmbeddings(
         model_name=EMBEDDING_MODEL,
@@ -75,13 +74,9 @@ def save_to_chroma(chunks: list[Document]):
         encode_kwargs={'normalize_embeddings': True}
     )
 
-    db = Chroma.from_documents(
-        chunks,
-        embedding,
-        persist_directory=CHROMA_PATH
-    )
-    db.persist()
-    print(f"✅ Saved {len(chunks)} chunks to `{CHROMA_PATH}`.")
+    db = FAISS.from_documents(chunks, embedding)
+    db.save_local(FAISS_INDEX_PATH)
+    print(f"✅ Saved {len(chunks)} chunks to FAISS index at `{FAISS_INDEX_PATH}`.")
 
 
 def generate_data_store():
@@ -90,7 +85,7 @@ def generate_data_store():
         print("❌ No documents found. Check the file path.")
         return
     chunks = split_text(documents)
-    save_to_chroma(chunks)
+    save_to_faiss(chunks)
 
 
 def main():

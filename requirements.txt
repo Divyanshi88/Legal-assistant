@@ -14,7 +14,7 @@ langchain-community>=0.1.0
 langchain-openai>=0.1.0
 
 # Vector Store
-chromadb>=0.4.0
+faiss-cpu>=1.7.4
 
 # Embedding Models
 sentence-transformers>=2.2.0
