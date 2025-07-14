@@ -33,6 +33,7 @@ except ImportError as e:
 
 # Configuration - Direct definitions to avoid import issues
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+HUGGINGFACEHUB_API_TOKEN = os.getenv("HUGGINGFACEHUB_API_TOKEN", "")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
 
