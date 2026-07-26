@@ -1,478 +1,400 @@
-# app.py
+"""Nayya — a source-grounded legal information assistant for women in India."""
 
-import streamlit as st
-import time
-from datetime import datetime
+import html
 import os
 import sys
 import traceback
 
-# Load environment variables first (with fallback for deployment)
+import streamlit as st
+
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except ImportError:
-    # If dotenv is not available (e.g., in some deployment environments)
-    # Environment variables should be set directly in the deployment platform
     pass
 
-# Add current directory to Python path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-# Page configuration
 st.set_page_config(
-    page_title="🏛️ Legal Assistant - Women's Rights & Domestic Violence",
-    page_icon="⚖️",
+    page_title="Nayya | Understand your rights",
+    page_icon="✦",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="collapsed",
 )
 
-# Safe import with detailed error handling
+
 def safe_import_rag():
     try:
-        # Try to import the module
         from query_database import EnhancedRAGPipeline
-        
-        # Try to import CHAT_MODELS, with fallback
-        try:
-            from query_database import CHAT_MODELS
-        except ImportError:
-            # Fallback CHAT_MODELS if not available
-            CHAT_MODELS = {
-                "mistral": "mistralai/mistral-7b-instruct",
-                "llama": "meta-llama/llama-3-8b-instruct",
-                "gpt": "openai/gpt-3.5-turbo"
-            }
-        
-        return EnhancedRAGPipeline, CHAT_MODELS, None
-    except Exception as e:
-        error_details = f"Error importing RAG pipeline: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
-        return None, None, error_details
 
-# Try to import RAG pipeline
-EnhancedRAGPipeline, CHAT_MODELS, import_error = safe_import_rag()
+        return EnhancedRAGPipeline, None
+    except Exception as exc:
+        return None, f"{exc}\n\n{traceback.format_exc()}"
 
-# If import failed, show error and provide debug info
-if import_error:
-    st.error("❌ Failed to import RAG pipeline")
-    
-    with st.expander("🔍 Debug Information"):
-        st.text(import_error)
-        
-        st.write("**Files in current directory:**")
-        try:
-            files = os.listdir(".")
-            for file in files:
-                st.write(f"- {file}")
-        except Exception as e:
-            st.write(f"Could not list files: {e}")
-        
-        st.write("**Environment variables:**")
-        st.write(f"- OPENROUTER_API_KEY: {'✅ Set' if os.getenv('OPENROUTER_API_KEY') else '❌ Not set'}")
-        
-        st.write("**Python path:**")
-        for path in sys.path:
-            st.write(f"- {path}")
-    
-    st.info("Please check that all required files are uploaded and environment variables are set in Streamlit secrets.")
-    st.stop()
 
-# Initialize CHAT_MODELS if not available
-if not CHAT_MODELS:
-    CHAT_MODELS = {
-        "mistral": "mistralai/mistral-7b-instruct",
-        "llama": "meta-llama/llama-3-8b-instruct",
-        "gpt": "openai/gpt-3.5-turbo"
-    }
+EnhancedRAGPipeline, import_error = safe_import_rag()
 
-# Custom CSS for professional styling
-st.markdown("""
+st.markdown(
+    """
 <style>
-    .main-header {
-        background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
-        padding: 2rem;
-        border-radius: 10px;
-        margin-bottom: 2rem;
-        text-align: center;
-        color: white;
-    }
-    
-    .main-header h1, .main-header h3, .main-header p {
-        color: white !important;
-    }
-    
-    .suggestion-card {
-        background: #f8f9fa;
-        border: 1px solid #e9ecef;
-        border-radius: 8px;
-        padding: 1rem;
-        margin: 0.5rem 0;
-        cursor: pointer;
-        transition: all 0.3s ease;
-    }
-    
-    .suggestion-card:hover {
-        background: #e9ecef;
-        border-color: #2a5298;
-        transform: translateY(-2px);
-    }
-    
-    .chat-container {
-        max-height: 500px;
-        overflow-y: auto;
-        padding: 1rem;
-        background: white;
-        border-radius: 10px;
-        border: 1px solid #e9ecef;
-    }
-    
-    .user-message {
-        background: #007bff;
-        color: white;
-        padding: 0.8rem 1.2rem;
-        border-radius: 18px 18px 4px 18px;
-        margin: 0.5rem 0;
-        max-width: 80%;
-        margin-left: auto;
-    }
-    
-    .bot-message {
-        background: #f8f9fa;
-        color: #333 !important;
-        padding: 0.8rem 1.2rem;
-        border-radius: 18px 18px 18px 4px;
-        margin: 0.5rem 0;
-        max-width: 80%;
-        border-left: 4px solid #2a5298;
-    }
-    
-    .bot-message strong {
-        color: #333 !important;
-    }
-    
-    .legal-notice {
-        background: #fff3cd;
-        border: 1px solid #ffeaa7;
-        border-radius: 8px;
-        padding: 1rem;
-        margin: 1rem 0;
-        color: #333 !important;
-    }
-    
-    .legal-notice h4, .legal-notice p {
-        color: #333 !important;
-    }
-    
-    .quick-actions {
-        display: flex;
-        gap: 1rem;
-        margin: 1rem 0;
-        flex-wrap: wrap;
-    }
-    
-    .action-btn {
-        background: #28a745;
-        color: white;
-        padding: 0.5rem 1rem;
-        border: none;
-        border-radius: 20px;
-        cursor: pointer;
-        font-size: 0.9rem;
-        transition: background 0.3s;
-    }
-    
-    .action-btn:hover {
-        background: #218838;
-    }
-    
-    .stats-container {
-        display: flex;
-        justify-content: space-around;
-        background: #f8f9fa;
-        padding: 1rem;
-        border-radius: 8px;
-        margin: 1rem 0;
-    }
-    
-    .stat-item {
-        text-align: center;
-        color: #333 !important;
-    }
-    
-    .stat-item div {
-        color: #333 !important;
-    }
-    
-    .stat-number {
-        font-size: 1.5rem;
-        font-weight: bold;
-        color: #2a5298;
-    }
+:root {
+  --ink: #25101f;
+  --plum: #4b193b;
+  --berry: #842d51;
+  --rose: #dba5aa;
+  --ivory: #fbf6eb;
+  --paper: #fffdf7;
+  --gold: #d49a1d;
+  --sage: #416b55;
+  --line: #ddcfbf;
+  --muted: #665b60;
+}
+
+html, body, [class*="css"] {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--ink);
+}
+.stApp {
+  background:
+    radial-gradient(circle at 88% 10%, rgba(212,154,29,.12) 0 8rem, transparent 8.1rem),
+    linear-gradient(110deg, rgba(132,45,81,.035), transparent 44%),
+    var(--ivory);
+}
+[data-testid="stHeader"] { background: transparent; }
+[data-testid="stAppViewContainer"] > .main .block-container {
+  max-width: 1180px;
+  padding-top: 1.25rem;
+  padding-bottom: 3rem;
+}
+#MainMenu, footer { visibility: hidden; }
+
+.nayya-bar {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:.75rem 0 1rem; border-bottom:1px solid var(--line);
+}
+.nayya-wordmark {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size:1.55rem; font-weight:700; letter-spacing:-.03em; color:var(--plum);
+}
+.nayya-wordmark i { color:var(--gold); font-style:normal; margin-right:.38rem; }
+.nayya-scope {
+  color:var(--muted); font-size:.76rem; font-weight:650;
+  letter-spacing:.08em; text-transform:uppercase;
+}
+.hero {
+  position:relative; padding:3.7rem 0 2.4rem; max-width:930px;
+}
+.hero::after {
+  content:""; position:absolute; width:126px; height:63px; right:0; top:2.8rem;
+  border:2px solid var(--gold); border-bottom:0; border-radius:130px 130px 0 0;
+  opacity:.65;
+}
+.eyebrow {
+  color:var(--berry); text-transform:uppercase; letter-spacing:.13em;
+  font-size:.72rem; font-weight:750; margin-bottom:1rem;
+}
+.hero h1 {
+  font-family:Georgia, "Times New Roman", serif; color:var(--ink);
+  font-size:clamp(2.55rem, 6.8vw, 5.35rem); line-height:.98;
+  max-width:820px; letter-spacing:-.055em; margin:0 0 1.35rem;
+}
+.hero p {
+  max-width:680px; color:var(--muted); font-size:1.08rem; line-height:1.7; margin:0;
+}
+.safety {
+  border-left:5px solid var(--gold); border-top:1px solid var(--line);
+  border-bottom:1px solid var(--line); padding:1rem 1.15rem;
+  background:rgba(255,253,247,.72); margin:.25rem 0 2rem;
+  color:#3f3539; font-size:.92rem; line-height:1.55;
+}
+.safety strong { color:var(--ink); }
+.section-label {
+  color:var(--berry); text-transform:uppercase; letter-spacing:.12em;
+  font-size:.7rem; font-weight:800; margin:0 0 .35rem;
+}
+.conversation-title {
+  font-family:Georgia, "Times New Roman", serif; font-size:2rem;
+  letter-spacing:-.025em; margin:0 0 .4rem; color:var(--ink);
+}
+.conversation-intro { color:var(--muted); margin:0 0 1.2rem; }
+
+[data-testid="stChatMessage"] {
+  background:var(--paper); border:1px solid var(--line); border-radius:3px;
+  padding:1rem 1.1rem; margin:.75rem 0;
+  box-shadow:0 8px 24px rgba(37,16,31,.045);
+}
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
+  background:#f4e6e6; border-color:#d8b9b7;
+}
+[data-testid="stChatMessage"] p { line-height:1.7; }
+[data-testid="stChatInput"] {
+  border:1.5px solid var(--plum); border-radius:3px;
+  background:var(--paper);
+}
+[data-testid="stChatInput"]:focus-within {
+  box-shadow:0 0 0 3px rgba(212,154,29,.28);
+}
+
+.stButton > button {
+  border-radius:3px; min-height:2.85rem; border:1px solid #bba99b;
+  background:var(--paper); color:var(--ink); font-weight:650;
+  transition:transform .16s ease, border-color .16s ease, background .16s ease;
+}
+.stButton > button:hover {
+  border-color:var(--berry); color:var(--plum); background:#fff9f2;
+  transform:translateY(-1px);
+}
+.stButton > button:focus { box-shadow:0 0 0 3px rgba(212,154,29,.34) !important; }
+.stButton > button[kind="primary"] {
+  background:var(--plum); color:white; border-color:var(--plum);
+}
+.stButton > button[kind="primary"]:hover { background:#351128; color:white; }
+
+.help-cluster, .trust-panel {
+  margin-top:1.7rem; padding:1.25rem 1.35rem; border-top:3px solid var(--plum);
+  background:var(--paper); box-shadow:0 8px 28px rgba(37,16,31,.05);
+}
+.trust-panel { border-top-color:var(--sage); }
+.panel-title {
+  font-family:Georgia, "Times New Roman", serif; color:var(--ink);
+  font-size:1.28rem; margin:0 0 .75rem;
+}
+.help-list { display:grid; gap:.65rem; }
+.help-item { border-bottom:1px solid var(--line); padding:0 0 .65rem; line-height:1.45; }
+.help-item:last-child { border:0; padding-bottom:0; }
+.help-item b { color:var(--berry); margin-right:.35rem; }
+.trust-panel p { color:var(--muted); font-size:.88rem; line-height:1.6; margin:.55rem 0; }
+.source-badge {
+  display:inline-block; color:var(--sage); font-size:.72rem; font-weight:800;
+  letter-spacing:.06em; text-transform:uppercase; margin-bottom:.35rem;
+}
+.answer-meta { color:var(--sage); font-size:.77rem; margin-top:.65rem; }
+.site-footer {
+  margin-top:3.5rem; padding-top:1.15rem; border-top:1px solid var(--line);
+  color:var(--muted); font-size:.78rem; line-height:1.6;
+}
+
+@media (max-width: 700px) {
+  [data-testid="stAppViewContainer"] > .main .block-container { padding: .75rem 1rem 2rem; }
+  .nayya-scope { font-size:.62rem; letter-spacing:.04em; }
+  .hero { padding:2.5rem 0 1.8rem; }
+  .hero h1 { font-size:2.8rem; max-width:92%; }
+  .hero::after { width:74px; height:37px; right:0; top:2.2rem; }
+  .hero p { font-size:.98rem; }
+  [data-testid="column"] { min-width:100% !important; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .hero, .safety { animation:rise .55s ease both; }
+  .safety { animation-delay:.1s; }
+  @keyframes rise { from { opacity:0; transform:translateY(9px); } to { opacity:1; transform:none; } }
+}
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
 
-# Header
-st.markdown("""
-<div class="main-header">
-    <h1>⚖️ Legal Assistant</h1>
-    <h3>Protection of Women from Domestic Violence Act, 2005</h3>
-    <p>Get instant legal guidance and support • Available 24/7 • Confidential & Secure</p>
-</div>
-""", unsafe_allow_html=True)
+st.markdown(
+    """
+<header class="nayya-bar">
+  <div class="nayya-wordmark"><i>✦</i>Nayya</div>
+  <div class="nayya-scope">Legal information&nbsp; • &nbsp;India</div>
+</header>
+<section class="hero">
+  <div class="eyebrow">Knowledge is a form of power</div>
+  <h1>Understand your rights.<br>Choose your next step.</h1>
+  <p>Plain-language information grounded in the Protection of Women from
+  Domestic Violence Act, 2005—designed to help you find your footing.</p>
+</section>
+""",
+    unsafe_allow_html=True,
+)
 
-# Function to initialize pipeline safely
-@st.cache_resource
-def initialize_pipeline():
-    try:
-        # Get the first available model
-        first_model = list(CHAT_MODELS.values())[0]
-        pipeline = EnhancedRAGPipeline(first_model)
-        return pipeline, None
-    except Exception as e:
-        error_msg = f"Failed to initialize pipeline: {str(e)}\n\nTraceback:\n{traceback.format_exc()}"
-        return None, error_msg
+verified_helpline = os.getenv("VERIFIED_WOMEN_HELPLINE", "").strip()
+helpline_text = (
+    f" A verified support line configured for this service is: <strong>{html.escape(verified_helpline)}</strong>."
+    if verified_helpline
+    else " A verified local helpline can be added by the service administrator."
+)
+st.markdown(
+    f"""
+<aside class="safety"><strong>Your safety comes first.</strong> If you are in immediate
+danger, move to a safer place if you can and contact local emergency services.
+{helpline_text}</aside>
+""",
+    unsafe_allow_html=True,
+)
 
-# Initialize session state
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
-
+if "response_style" not in st.session_state:
+    st.session_state.response_style = "Plain language"
 if "pipeline_initialized" not in st.session_state:
     st.session_state.pipeline_initialized = False
 
-# Function to handle question processing
-def process_question(question):
+
+@st.cache_resource
+def initialize_pipeline():
     try:
-        with st.spinner("🤔 Analyzing your question..."):
-            result = st.session_state.pipeline.query_with_sources(
-                question,
-                mode="legal"
-            )
-        
-        # Add bot response to history
-        response_content = f"""{result["answer"]}
+        return EnhancedRAGPipeline(), None
+    except Exception as exc:
+        return None, f"{exc}\n\n{traceback.format_exc()}"
 
----
-⏱️ **Response time:** {result['processing_time']:.2f}s  
-📄 **Sources consulted:** {len(result['sources'])} legal documents"""
-        
-        st.session_state.chat_history.append({"role": "assistant", "content": response_content})
-        return True
-    except Exception as e:
-        error_response = f"❌ Sorry, I encountered an error processing your question: {str(e)}"
-        st.session_state.chat_history.append({"role": "assistant", "content": error_response})
-        return False
 
-# Try to initialize pipeline
-if not st.session_state.pipeline_initialized:
-    with st.spinner("🔧 Initializing AI system..."):
-        pipeline, pipeline_error = initialize_pipeline()
-        
-        if pipeline_error:
-            st.error("❌ Failed to initialize AI pipeline")
-            with st.expander("🔍 Pipeline Error Details"):
-                st.text(pipeline_error)
-            st.stop()
-        else:
-            st.session_state.pipeline = pipeline
-            st.session_state.pipeline_initialized = True
-            st.success("✅ AI system initialized successfully!")
-
-# Sidebar for settings
-with st.sidebar:
-    st.title("⚙️ Settings")
-    
-    # Model selection
-    model_key = st.selectbox("AI Model", list(CHAT_MODELS.keys()), index=0)
-    
-    # Model change button
-    if st.button("🔄 Change Model"):
-        try:
-            with st.spinner("🔧 Switching model..."):
-                new_pipeline = EnhancedRAGPipeline(CHAT_MODELS[model_key])
-                st.session_state.pipeline = new_pipeline
-                st.success(f"✅ Switched to {model_key}")
-        except Exception as e:
-            st.error(f"❌ Failed to switch model: {e}")
-    
-    if st.button("🔄 Reset Chat"):
-        st.session_state.chat_history = []
-        st.rerun()
-    
-    # Show current model info
-    if hasattr(st.session_state, 'pipeline') and hasattr(st.session_state.pipeline, 'model_name'):
-        st.info(f"Current model: {st.session_state.pipeline.model_name}")
-    
-    # Emergency contacts
-    st.markdown("---")
-    st.markdown("### 📞 Emergency Contacts")
-    st.markdown("""
-    **National Commission for Women**  
-    📞 7827170170
-    
-    **Police Helpline**  
-    📞 1091 / 1291
-    
-    **Delhi Women's Cell**  
-    📞 (011) 23317004
-    """)
-
-# Main content area
-col1, col2 = st.columns([2, 1])
-
-with col1:
-    # Quick Start Section
-    if not st.session_state.chat_history:
-        st.markdown("### 🚀 Quick Start - How can I help you today?")
-        
-        # Suggested questions
-        suggested_questions = [
-            "What is considered domestic violence under the law?",
-            "How do I file a complaint for domestic violence?",
-            "What is a Protection Order and how do I get one?",
-            "What financial help can I get as a victim?",
-            "Can I get custody of my children?",
-            "Do I have the right to stay in my house?",
-            "What happens after I file a case?",
-            "Who can help me file a complaint?",
-            "What are the different types of orders a Magistrate can pass?",
-            "How long does it take to resolve a case?",
-            "Can someone else file a complaint on my behalf?",
-            "What is the role of a Protection Officer?"
-        ]
-        
-        # Display suggestions in a grid
-        cols = st.columns(2)
-        for i, question in enumerate(suggested_questions):
-            with cols[i % 2]:
-                if st.button(f"💬 {question}", key=f"suggest_{i}", use_container_width=True):
-                    # Add user message to history
-                    st.session_state.chat_history.append({"role": "user", "content": question})
-                    
-                    # Process the question
-                    process_question(question)
-                    st.rerun()
-    
-    # Chat Interface
-    if st.session_state.chat_history:
-        st.markdown("### 💬 Chat History")
-        chat_container = st.container()
-        
-        with chat_container:
-            for message in st.session_state.chat_history:
-                if message["role"] == "user":
-                    st.markdown(f"""
-                    <div style="text-align: right;">
-                        <div class="user-message">
-                            <strong>You:</strong> {message["content"]}
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
-                else:
-                    # Clean the message content and preserve line breaks
-                    clean_content = message["content"].replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
-                    st.markdown(f"""
-                    <div class="bot-message">
-                        <strong>🤖 Legal Assistant:</strong><br>
-                        {clean_content}
-                    </div>
-                    """, unsafe_allow_html=True)
-    
-    # Input area
-    st.markdown("---")
-    
-    # Create a form for better input handling
-    with st.form(key="chat_form", clear_on_submit=True):
-        user_input = st.text_input(
-            "💭 Ask your legal question here...",
-            placeholder="Type your question about domestic violence law...",
-            key="user_input_form"
+def process_question(question):
+    mode = "plain" if st.session_state.response_style == "Plain language" else "legal"
+    try:
+        with st.spinner("Looking through the source material…"):
+            result = st.session_state.pipeline.query_with_sources(question, mode=mode)
+        st.session_state.chat_history.append(
+            {
+                "role": "assistant",
+                "content": result.get("answer", "I could not generate an answer."),
+                "source_count": len(result.get("sources", [])),
+                "sources": [
+                    {
+                        "page": source.metadata.get("page"),
+                        "section": source.metadata.get("section"),
+                        "excerpt": source.page_content[:500].strip(),
+                    }
+                    for source in result.get("sources", [])
+                ],
+            }
         )
-        
-        send_button = st.form_submit_button("📤 Send", type="primary", use_container_width=True)
-        
-        # Process user input
-        if send_button and user_input.strip():
-            # Add user message to history
-            st.session_state.chat_history.append({"role": "user", "content": user_input})
-            
-            # Process the question
-            process_question(user_input)
+    except Exception:
+        st.session_state.chat_history.append(
+            {
+                "role": "assistant",
+                "content": (
+                    "I’m sorry—I couldn’t complete that search. Please try again later "
+                    "or check with a qualified legal-aid professional."
+                ),
+                "source_count": 0,
+            }
+        )
+
+
+if import_error:
+    st.error("The legal information system could not be loaded.")
+    with st.expander("Technical details"):
+        st.code(import_error)
+    st.stop()
+
+if not st.session_state.pipeline_initialized:
+    pipeline, pipeline_error = initialize_pipeline()
+    if pipeline_error:
+        st.error("Nayya could not connect to its source library.")
+        st.caption("The service administrator needs to check its API configuration.")
+        with st.expander("Technical details"):
+            st.code(pipeline_error)
+        st.stop()
+    st.session_state.pipeline = pipeline
+    st.session_state.pipeline_initialized = True
+
+main_col, side_col = st.columns([1.9, 1], gap="large")
+
+with main_col:
+    st.markdown(
+        """
+<div class="section-label">Ask Nayya</div>
+<h2 class="conversation-title">What would you like to understand?</h2>
+<p class="conversation-intro">Ask one question at a time. You do not need to share names,
+addresses, case numbers, or other identifying details.</p>
+""",
+        unsafe_allow_html=True,
+    )
+
+    control_col, reset_col = st.columns([2, 1])
+    with control_col:
+        st.radio(
+            "Response style",
+            ["Plain language", "Legal detail"],
+            horizontal=True,
+            key="response_style",
+            help="Plain language explains concepts simply. Legal detail uses more statutory terminology.",
+        )
+    with reset_col:
+        st.write("")
+        if st.button("Reset conversation", use_container_width=True):
+            st.session_state.chat_history = []
             st.rerun()
 
-with col2:
-    # Quick Actions
-    st.markdown("### ⚡ Quick Actions")
-    
-    if st.button("🆘 Emergency Help", use_container_width=True):
-        st.info("Call 100 for immediate police assistance")
-    if st.button("📋 File Complaint", use_container_width=True):
-        st.info("Contact your local police station or magistrate")
-    if st.button("👥 Find Support", use_container_width=True):
-        st.info("Reach out to NGOs and women's support organizations")
-    if st.button("📞 Contact Lawyer", use_container_width=True):
-        st.info("Free legal aid is available - call 7827170170")
-    
-    # Statistics
-    st.markdown("### 📊 Quick Stats")
-    st.markdown("""
-    <div class="stats-container">
-        <div class="stat-item">
-            <div class="stat-number">3</div>
-            <div>Days to start proceedings</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-number">60</div>
-            <div>Days to resolve case</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-number">24/7</div>
-            <div>Help available</div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Legal Notice
-    st.markdown("### ⚠️ Important Legal Notice")
-    st.warning("""
-    **Important Legal Notice**
-    
-    This chatbot provides information based on the Protection of Women from Domestic Violence Act, 2005. For specific legal advice, please consult with a qualified lawyer.
-    
-    **In case of emergency, contact police immediately at 100.**
-    """)
-    
-    # Key Features
-    st.markdown("### ✨ Key Features")
-    st.markdown("""
-    - 🔒 **Confidential**: Your questions are private and secure
-    - ⚡ **Instant**: Get immediate legal guidance
-    - 📚 **Accurate**: Based on official legal documents
-    - 🆓 **Free**: No charges for legal information
-    - 🌐 **24/7**: Available anytime, anywhere
-    - 📱 **Mobile-friendly**: Works on all devices
-    """)
-    
-    # Recent Topics
-    if st.session_state.chat_history:
-        st.markdown("### 📈 Your Recent Topics")
-        recent_topics = []
-        for msg in st.session_state.chat_history[-6:]:
-            if msg["role"] == "user":
-                topic = msg["content"][:50] + "..." if len(msg["content"]) > 50 else msg["content"]
-                recent_topics.append(f"• {topic}")
-        
-        for topic in recent_topics:
-            st.markdown(topic)
+    suggestions = [
+        "What counts as domestic violence under the Act?",
+        "Can I ask for the right to stay in my shared home?",
+        "What protection and monetary orders may be available?",
+        "Who can help me make a complaint?",
+    ]
+    if not st.session_state.chat_history:
+        st.caption("You could start with:")
+        suggestion_cols = st.columns(2)
+        for index, suggestion in enumerate(suggestions):
+            with suggestion_cols[index % 2]:
+                if st.button(suggestion, key=f"suggestion_{index}", use_container_width=True):
+                    st.session_state.chat_history.append({"role": "user", "content": suggestion})
+                    process_question(suggestion)
+                    st.rerun()
 
-# Footer
-st.markdown("---")
-st.markdown("""
-<div style="text-align: center; padding: 2rem; background: #f8f9fa; border-radius: 10px; margin-top: 2rem; color: #333;">
-    <h4 style="color: #333;">🛡️ Your Rights Matter</h4>
-    <p style="color: #333;">This service is provided to help you understand your legal rights under the Protection of Women from Domestic Violence Act, 2005.</p>
-    <p style="color: #333;"><strong>Remember:</strong> You are not alone. Help is available.</p>
-    <p style="font-size: 0.9rem; color: #666;">
-        🔐 All conversations are confidential • 📱 Available on mobile • 🆓 Completely free service
-    </p>
-</div>
-""", unsafe_allow_html=True)
+    for message in st.session_state.chat_history:
+        avatar = "✦" if message["role"] == "assistant" else None
+        with st.chat_message(message["role"], avatar=avatar):
+            st.markdown(message["content"])
+            if message["role"] == "assistant":
+                count = message.get("source_count", 0)
+                if count:
+                    st.markdown(
+                        f'<div class="answer-meta">Source-grounded • {count} document excerpt{"s" if count != 1 else ""} consulted</div>',
+                        unsafe_allow_html=True,
+                    )
+                    with st.expander("View source passages"):
+                        for index, source in enumerate(message.get("sources", []), start=1):
+                            label = f"S{index} · page {source.get('page', 'unknown')}"
+                            if source.get("section"):
+                                label += f" · section {source['section']}"
+                            st.markdown(f"**{label}**")
+                            st.caption(source.get("excerpt", ""))
+                else:
+                    st.caption("No matching source excerpt was found. Please verify this response.")
+
+    if question := st.chat_input("Ask about your rights or the complaint process"):
+        st.session_state.chat_history.append({"role": "user", "content": question})
+        process_question(question)
+        st.rerun()
+
+with side_col:
+    st.markdown(
+        """
+<section class="help-cluster">
+  <h3 class="panel-title">What this can help with</h3>
+  <div class="help-list">
+    <div class="help-item"><b>01</b> Understand types of abuse recognised by the Act</div>
+    <div class="help-item"><b>02</b> Explore protection, residence and monetary orders</div>
+    <div class="help-item"><b>03</b> Learn how a complaint may move forward</div>
+    <div class="help-item"><b>04</b> Find legal-aid and support pathways</div>
+  </div>
+</section>
+<section class="trust-panel">
+  <span class="source-badge">Source-aware by design</span>
+  <h3 class="panel-title">A clear boundary builds trust.</h3>
+  <p>Nayya provides legal information, not legal advice. Answers are generated from
+  source material but may be incomplete or mistaken.</p>
+  <p>Do not enter names, addresses, phone numbers, case IDs, or other sensitive
+  personal details.</p>
+  <p>Before acting, check important information with a qualified lawyer, legal-aid
+  service, Protection Officer, or relevant authority.</p>
+</section>
+""",
+        unsafe_allow_html=True,
+    )
+
+st.markdown(
+    """
+<footer class="site-footer">
+  <strong>Scope:</strong> Information about the Protection of Women from Domestic
+  Violence Act, 2005. Responses are generated from the service’s indexed source
+  documents and should be independently verified. Nayya is not a government authority
+  and does not replace a lawyer or emergency service.
+</footer>
+""",
+    unsafe_allow_html=True,
+)
