@@ -44,6 +44,21 @@ MIN_RELEVANCE = 0.12
 MAX_SOURCES = 5
 
 
+def _config_value(name: str, default: str = "") -> str:
+    """Read configuration from the environment or Streamlit Cloud secrets."""
+    environment_value = os.getenv(name, "").strip()
+    if environment_value:
+        return environment_value
+
+    try:
+        import streamlit as st
+
+        secret_value = str(st.secrets.get(name, "")).strip()
+        return secret_value or default
+    except Exception:
+        return default
+
+
 @dataclass(frozen=True)
 class SourceDocument:
     page_content: str
@@ -156,8 +171,10 @@ class LexicalRetriever:
 
 class EnhancedRAGPipeline:
     def __init__(self, model_name: str | None = None, client: OpenAI | None = None):
-        api_key = os.getenv("OPENROUTER_API_KEY", "")
-        self.model_name = model_name or DEFAULT_CHAT_MODEL
+        api_key = _config_value("OPENROUTER_API_KEY")
+        self.model_name = model_name or _config_value(
+            "OPENROUTER_MODEL", DEFAULT_CHAT_MODEL
+        )
         self.client = client
         if self.client is None and api_key:
             self.client = OpenAI(api_key=api_key, base_url=OPENROUTER_BASE_URL)
