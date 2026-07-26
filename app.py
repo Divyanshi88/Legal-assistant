@@ -84,6 +84,7 @@ html, body, [class*="css"] {
 }
 .hero {
   position:relative; padding:2.25rem 0 1.45rem; max-width:930px;
+  opacity:1; transform:none; visibility:visible;
 }
 .hero::after {
   content:""; position:absolute; width:110px; height:55px; right:0; top:1.75rem;
@@ -107,6 +108,7 @@ html, body, [class*="css"] {
   border-bottom:1px solid var(--line); padding:1rem 1.15rem;
   background:rgba(255,253,247,.72); margin:.25rem 0 1.45rem;
   color:#3f3539; font-size:.92rem; line-height:1.55;
+  opacity:1; transform:none; visibility:visible;
 }
 .safety strong { color:var(--ink); }
 .section-label {
@@ -204,11 +206,6 @@ html, body, [class*="css"] {
   .nayya-scope { max-width:9.5rem; text-align:right; line-height:1.35; }
   .hero h1 { font-size:2.2rem; letter-spacing:-.045em; }
   .conversation-title { font-size:1.7rem; }
-}
-@media (prefers-reduced-motion: no-preference) {
-  .hero, .safety { animation:rise .55s ease both; }
-  .safety { animation-delay:.1s; }
-  @keyframes rise { from { opacity:0; transform:translateY(9px); } to { opacity:1; transform:none; } }
 }
 </style>
 """,
