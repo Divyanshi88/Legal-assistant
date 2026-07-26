@@ -157,11 +157,10 @@ class LexicalRetriever:
 class EnhancedRAGPipeline:
     def __init__(self, model_name: str | None = None, client: OpenAI | None = None):
         api_key = os.getenv("OPENROUTER_API_KEY", "")
-        if client is None and not api_key:
-            raise ValueError("OPENROUTER_API_KEY is required.")
-
         self.model_name = model_name or DEFAULT_CHAT_MODEL
-        self.client = client or OpenAI(api_key=api_key, base_url=OPENROUTER_BASE_URL)
+        self.client = client
+        if self.client is None and api_key:
+            self.client = OpenAI(api_key=api_key, base_url=OPENROUTER_BASE_URL)
         self.retriever = LexicalRetriever(load_source_documents())
 
     def get_sources(self, question: str) -> list[SourceDocument]:
@@ -190,6 +189,14 @@ class EnhancedRAGPipeline:
             return self._result(
                 "I couldn’t find enough relevant information in the source document to answer that safely. A qualified legal-aid professional can help with your specific situation.",
                 [],
+                started,
+                mode,
+            )
+
+        if self.client is None:
+            return self._result(
+                self._extractive_answer(sources),
+                sources,
                 started,
                 mode,
             )
@@ -245,6 +252,24 @@ QUESTION
             sources = []
 
         return self._result(answer, sources, started, mode)
+
+    @staticmethod
+    def _extractive_answer(sources: list[SourceDocument]) -> str:
+        """Return cited source excerpts when no generation provider is configured."""
+        excerpts: list[str] = []
+        for index, source in enumerate(sources[:3], start=1):
+            compact = re.sub(r"\s+", " ", source.page_content).strip()
+            sentences = re.split(r"(?<=[.!?])\s+", compact)
+            excerpt = " ".join(sentences[:2]).strip()
+            if len(excerpt) > 520:
+                excerpt = excerpt[:517].rsplit(" ", 1)[0] + "…"
+            excerpts.append(f"**[S{index}]** {excerpt}")
+
+        return (
+            "I found these relevant passages in the source document. "
+            "They are quoted for legal information and are not advice about an individual case.\n\n"
+            + "\n\n".join(excerpts)
+        )
 
     def _result(
         self,

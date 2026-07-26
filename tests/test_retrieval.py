@@ -57,3 +57,14 @@ def test_irrelevant_question_is_refused_without_model_call():
 
     assert result["sources"] == []
     assert "enough relevant information" in result["answer"]
+
+
+def test_pipeline_works_without_api_key(monkeypatch):
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    pipeline = query_database.EnhancedRAGPipeline()
+
+    result = pipeline.query_with_sources("What is domestic violence?")
+
+    assert result["sources"]
+    assert "[S1]" in result["answer"]
+    assert "relevant passages" in result["answer"]

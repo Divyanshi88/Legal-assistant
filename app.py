@@ -83,10 +83,10 @@ html, body, [class*="css"] {
   letter-spacing:.08em; text-transform:uppercase;
 }
 .hero {
-  position:relative; padding:3.7rem 0 2.4rem; max-width:930px;
+  position:relative; padding:2.25rem 0 1.45rem; max-width:930px;
 }
 .hero::after {
-  content:""; position:absolute; width:126px; height:63px; right:0; top:2.8rem;
+  content:""; position:absolute; width:110px; height:55px; right:0; top:1.75rem;
   border:2px solid var(--gold); border-bottom:0; border-radius:130px 130px 0 0;
   opacity:.65;
 }
@@ -96,7 +96,7 @@ html, body, [class*="css"] {
 }
 .hero h1 {
   font-family:Georgia, "Times New Roman", serif; color:var(--ink);
-  font-size:clamp(2.55rem, 6.8vw, 5.35rem); line-height:.98;
+  font-size:clamp(2.55rem, 5.2vw, 4.25rem); line-height:1;
   max-width:820px; letter-spacing:-.055em; margin:0 0 1.35rem;
 }
 .hero p {
@@ -105,7 +105,7 @@ html, body, [class*="css"] {
 .safety {
   border-left:5px solid var(--gold); border-top:1px solid var(--line);
   border-bottom:1px solid var(--line); padding:1rem 1.15rem;
-  background:rgba(255,253,247,.72); margin:.25rem 0 2rem;
+  background:rgba(255,253,247,.72); margin:.25rem 0 1.45rem;
   color:#3f3539; font-size:.92rem; line-height:1.55;
 }
 .safety strong { color:var(--ink); }
@@ -170,19 +170,40 @@ html, body, [class*="css"] {
   letter-spacing:.06em; text-transform:uppercase; margin-bottom:.35rem;
 }
 .answer-meta { color:var(--sage); font-size:.77rem; margin-top:.65rem; }
+.unavailable {
+  background:#f5e9e5; border:1px solid #d5b5ae; border-left:5px solid var(--berry);
+  padding:1rem 1.1rem; margin:.85rem 0 1.15rem; color:#3d2731; line-height:1.55;
+}
+.unavailable strong { display:block; color:var(--ink); margin-bottom:.2rem; }
 .site-footer {
   margin-top:3.5rem; padding-top:1.15rem; border-top:1px solid var(--line);
   color:var(--muted); font-size:.78rem; line-height:1.6;
 }
 
+@media (max-width: 900px) {
+  [data-testid="stHorizontalBlock"] { flex-wrap:wrap; }
+  [data-testid="column"] {
+    flex:1 1 100% !important; width:100% !important; min-width:0 !important;
+  }
+}
 @media (max-width: 700px) {
   [data-testid="stAppViewContainer"] > .main .block-container { padding: .75rem 1rem 2rem; }
   .nayya-scope { font-size:.62rem; letter-spacing:.04em; }
-  .hero { padding:2.5rem 0 1.8rem; }
-  .hero h1 { font-size:2.8rem; max-width:92%; }
-  .hero::after { width:74px; height:37px; right:0; top:2.2rem; }
+  .hero { padding:1.75rem 0 1.25rem; }
+  .hero h1 { font-size:clamp(2.25rem, 11.5vw, 2.8rem); max-width:94%; margin-bottom:1rem; }
+  .hero::after { width:62px; height:31px; right:0; top:1.4rem; }
   .hero p { font-size:.98rem; }
-  [data-testid="column"] { min-width:100% !important; }
+  .safety { margin-bottom:1.2rem; }
+  [data-testid="stChatInput"] { width:100%; }
+  .stButton > button { white-space:normal; height:auto; min-height:2.85rem; padding:.65rem .8rem; }
+  [data-testid="stRadio"] > div { gap:.35rem 1rem; flex-wrap:wrap; }
+  .help-cluster, .trust-panel { margin-top:1rem; }
+}
+@media (max-width: 380px) {
+  .nayya-wordmark { font-size:1.35rem; }
+  .nayya-scope { max-width:9.5rem; text-align:right; line-height:1.35; }
+  .hero h1 { font-size:2.2rem; letter-spacing:-.045em; }
+  .conversation-title { font-size:1.7rem; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .hero, .safety { animation:rise .55s ease both; }
@@ -231,6 +252,8 @@ if "response_style" not in st.session_state:
     st.session_state.response_style = "Plain language"
 if "pipeline_initialized" not in st.session_state:
     st.session_state.pipeline_initialized = False
+if "pipeline_attempted" not in st.session_state:
+    st.session_state.pipeline_attempted = False
 
 
 @st.cache_resource
@@ -242,6 +265,8 @@ def initialize_pipeline():
 
 
 def process_question(question):
+    if not getattr(st.session_state, "pipeline", None):
+        return
     mode = "plain" if st.session_state.response_style == "Plain language" else "legal"
     try:
         with st.spinner("Looking through the source material…"):
@@ -274,22 +299,22 @@ def process_question(question):
         )
 
 
-if import_error:
-    st.error("The legal information system could not be loaded.")
-    with st.expander("Technical details"):
-        st.code(import_error)
-    st.stop()
-
-if not st.session_state.pipeline_initialized:
+service_error = import_error
+if not import_error and not st.session_state.pipeline_initialized and not st.session_state.pipeline_attempted:
+    st.session_state.pipeline_attempted = True
     pipeline, pipeline_error = initialize_pipeline()
     if pipeline_error:
-        st.error("Nayya could not connect to its source library.")
-        st.caption("The service administrator needs to check its API configuration.")
-        with st.expander("Technical details"):
-            st.code(pipeline_error)
-        st.stop()
-    st.session_state.pipeline = pipeline
-    st.session_state.pipeline_initialized = True
+        service_error = pipeline_error
+        st.session_state.pipeline_error = pipeline_error
+    else:
+        st.session_state.pipeline = pipeline
+        st.session_state.pipeline_initialized = True
+
+if not service_error:
+    service_error = st.session_state.get("pipeline_error")
+pipeline_available = bool(
+    st.session_state.pipeline_initialized and getattr(st.session_state, "pipeline", None)
+)
 
 main_col, side_col = st.columns([1.9, 1], gap="large")
 
@@ -304,6 +329,19 @@ addresses, case numbers, or other identifying details.</p>
         unsafe_allow_html=True,
     )
 
+    if not pipeline_available:
+        st.markdown(
+            """
+<div class="unavailable" role="status">
+  <strong>Answers are temporarily unavailable.</strong>
+  You can still review the topics and safety guidance on this page. For legal help,
+  contact a qualified legal-aid service, Protection Officer, or relevant local
+  authority. If you are in immediate danger, contact local emergency services.
+</div>
+""",
+            unsafe_allow_html=True,
+        )
+
     control_col, reset_col = st.columns([2, 1])
     with control_col:
         st.radio(
@@ -312,6 +350,7 @@ addresses, case numbers, or other identifying details.</p>
             horizontal=True,
             key="response_style",
             help="Plain language explains concepts simply. Legal detail uses more statutory terminology.",
+            disabled=not pipeline_available,
         )
     with reset_col:
         st.write("")
@@ -330,13 +369,18 @@ addresses, case numbers, or other identifying details.</p>
         suggestion_cols = st.columns(2)
         for index, suggestion in enumerate(suggestions):
             with suggestion_cols[index % 2]:
-                if st.button(suggestion, key=f"suggestion_{index}", use_container_width=True):
+                if st.button(
+                    suggestion,
+                    key=f"suggestion_{index}",
+                    use_container_width=True,
+                    disabled=not pipeline_available,
+                ):
                     st.session_state.chat_history.append({"role": "user", "content": suggestion})
                     process_question(suggestion)
                     st.rerun()
 
     for message in st.session_state.chat_history:
-        avatar = "✦" if message["role"] == "assistant" else None
+        avatar = ":material/gavel:" if message["role"] == "assistant" else None
         with st.chat_message(message["role"], avatar=avatar):
             st.markdown(message["content"])
             if message["role"] == "assistant":
@@ -356,7 +400,12 @@ addresses, case numbers, or other identifying details.</p>
                 else:
                     st.caption("No matching source excerpt was found. Please verify this response.")
 
-    if question := st.chat_input("Ask about your rights or the complaint process"):
+    input_placeholder = (
+        "Ask about your rights or the complaint process"
+        if pipeline_available
+        else "Answers are temporarily unavailable"
+    )
+    if question := st.chat_input(input_placeholder, disabled=not pipeline_available):
         st.session_state.chat_history.append({"role": "user", "content": question})
         process_question(question)
         st.rerun()
