@@ -267,7 +267,11 @@ def process_question(question):
     mode = "plain" if st.session_state.response_style == "Plain language" else "legal"
     try:
         with st.spinner("Looking through the source material…"):
-            result = st.session_state.pipeline.query_with_sources(question, mode=mode)
+            result = st.session_state.pipeline.query_with_sources(
+                question,
+                mode=mode,
+                chat_history=st.session_state.chat_history,
+            )
         st.session_state.chat_history.append(
             {
                 "role": "assistant",

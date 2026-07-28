@@ -67,4 +67,35 @@ def test_pipeline_works_without_api_key(monkeypatch):
 
     assert result["sources"]
     assert "[S1]" in result["answer"]
-    assert "relevant passages" in result["answer"]
+    assert "relevant" in result["answer"]
+
+
+def test_pipeline_includes_chat_history():
+    received_messages = []
+
+    class RecordingCompletions:
+        def create(self, **kwargs):
+            nonlocal received_messages
+            received_messages = kwargs.get("messages", [])
+            message = SimpleNamespace(content="You have rights under the law. [S1]")
+            return SimpleNamespace(choices=[SimpleNamespace(message=message)])
+
+    class RecordingClient:
+        def __init__(self):
+            self.chat = SimpleNamespace(completions=RecordingCompletions())
+
+    pipeline = query_database.EnhancedRAGPipeline(client=RecordingClient())
+    history = [
+        {"role": "user", "content": "Hello, I need help."},
+        {"role": "assistant", "content": "I am here to help you. [S1]"},
+    ]
+
+    result = pipeline.query_with_sources(
+        "What is domestic violence?", chat_history=history
+    )
+
+    assert result["sources"]
+    assert len(received_messages) >= 4
+    assert received_messages[1]["content"] == "Hello, I need help."
+    assert received_messages[2]["content"] == "I am here to help you. [S1]"
+

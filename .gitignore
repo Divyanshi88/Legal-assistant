@@ -1,6 +1,7 @@
 # ⛔ Do NOT commit virtual environments
 venv/
 env/
+.venv/
 rag-env/
 
 # ⛔ Do NOT commit Python cache files
